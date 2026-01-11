@@ -6,7 +6,7 @@ https://svelte.dev/e/node_invalid_placement -->
 
 <div class="dropDownContainer ">
   <table class="dropDownTable">
-    <thbody>
+    <tbody>
       <DropDownRow
         rowTitle={"Break long lines"}
         rowImage={"log log-Break"}
@@ -28,6 +28,6 @@ https://svelte.dev/e/node_invalid_placement -->
         rowImage={"log log-Json"}
         storeValue={"transformJson"}
       />
-    </thbody>
+    </tbody>
   </table>
 </div>

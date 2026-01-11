@@ -149,9 +149,10 @@ https://svelte.dev/e/node_invalid_placement -->
       </div>
       <table class="userTable" role="list">
         <thead>
-          <th scope="row">User</th><th style="opacity:0">Role</th><th
-            style="opacity:0">Manage user</th
-          >
+          <tr>
+            <th scope="row">User</th><th style="opacity:0">Role</th>
+            <th style="opacity:0">Manage user</th>
+          </tr>
         </thead>
 
         <tbody>

@@ -2,8 +2,6 @@
   import { run } from 'svelte/legacy';
 
   // @ts-nocheck
-
-  import { each } from "svelte/internal";
   import { onMount } from "svelte";
 
   let sortedData = $state([]);

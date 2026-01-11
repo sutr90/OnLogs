@@ -792,13 +792,13 @@ https://svelte.dev/e/node_invalid_placement -->
           <Loader />
         </div>
         {/if}
-        <div id="startOfLogs" />
+        <!-- <div id="startOfLogs" />
         <IntersectionObserver
           element={startOfLogs}
           bind:intersecting={startOfLogsIntersect}
         >
           <div id="startOfLogs" bind:this={startOfLogs} />
-        </IntersectionObserver>
+        </IntersectionObserver> -->
         {#each allLogs as logItem, i}
           {#if transformLogStringForTimeBudget(logItem, $store.UTCtime) !== transformLogStringForTimeBudget(allLogs[i - 1], $store.UTCtime) && i - 1 >= 0}
             <div class="timeBudgeContainer">

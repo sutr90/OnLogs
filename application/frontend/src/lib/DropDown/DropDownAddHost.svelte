@@ -10,7 +10,7 @@ https://svelte.dev/e/node_invalid_placement -->
 
 <div class="dropDownContainer addHost " id="addHost">
   <table class="dropDownTable">
-    <thbody>
+    <tbody>
       <DropDownRow
         rowTitle={"Create services group"}
         rowImage={"log log-Group"}
@@ -29,6 +29,6 @@ https://svelte.dev/e/node_invalid_placement -->
           addHostMenuIsVisible.set(false);
         }}
       />
-    </thbody>
+    </tbody>
   </table>
 </div>

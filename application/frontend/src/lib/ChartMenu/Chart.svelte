@@ -1,5 +1,5 @@
 <script>
-  import { Bar } from "svelte-chartjs";
+  import { Bar } from "svelte5-chartjs";
   import {
     Chart as ChartJS,
     Title,
