@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "svelte-routing": path.resolve(__dirname, "src/lib/svelte-routing/index.js"),
     },
   },
   plugins: [svelte({})],

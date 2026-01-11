@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { Router, Link, Route } from "svelte-routing";
   import Main from "./Views/Main/Main.svelte";
   import Login from "./Views/Login/Login.svelte";
@@ -13,17 +15,22 @@
   import { onMount, onDestroy } from "svelte";
   import Toast from "./lib/Toast/Toast.svelte";
   import Notfound from "./lib/NotFound/Notfound.svelte";
-  export let url = "";
-  let themeState = "dark";
+  let themeState = $state("dark");
   let basePathname = "";
   let availibleRoutes = ["view", "login", "users", "servicesettings"];
   import { changeKey } from "./utils/changeKey";
   import { navigate } from "svelte-routing";
+  /**
+   * @typedef {Object} Props
+   * @property {string} [url]
+   */
+
+  /** @type {Props} */
+  let { url = "" } = $props();
 
   const unsubscribe = theme.subscribe((v) => {
     themeState = v;
   });
-  $: themeState && checkTheme(themeState);
 
   function checkTheme(t) {
     const bodyEl = document.querySelector("body");
@@ -74,11 +81,14 @@
     );
   }
 
-  $: {
+  run(() => {
+    themeState && checkTheme(themeState);
+  });
+  run(() => {
     if ($lastChosenHost && $lastChosenService) {
       writeLastChosenHostToLS();
     }
-  }
+  });
 </script>
 
 <Router {url} basepath={`${changeKey}/`}>

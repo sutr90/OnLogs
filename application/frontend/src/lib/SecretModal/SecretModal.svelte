@@ -15,7 +15,7 @@
   import DockerSnippet from "./DockerSnippet.svelte";
   import DockerComposeSnippet from "./DockerComposeSnippet.svelte";
 
-  let token = "";
+  let token = $state("");
   let origin = `${location.origin}${changeKey}`;
   const api = new FetchApi();
   async function getSecret() {
@@ -41,7 +41,7 @@
 <div
   class="secretModalContainer"
   use:clickOutside
-  on:click_outside={() => {
+  onclick_outside={() => {
     snipetModalIsVisible.set(false);
   }}
 >
@@ -51,7 +51,7 @@
       class={`labelItem clickable ${
         $currentSnippedOption === "Docker" ? "active" : ""
       }`}
-      on:click={() => {
+      onclick={() => {
         choseSnippetOption("Docker");
       }}
     >
@@ -61,7 +61,7 @@
       class={`labelItem clickable ${
         $currentSnippedOption === "DockerCompose" ? "active" : ""
       }`}
-      on:click={() => {
+      onclick={() => {
         choseSnippetOption("DockerCompose");
       }}
     >
@@ -110,9 +110,9 @@
     />
   </div>
 </div>
-<div class="modalOverlay" id="modalOverlay" />
+<div class="modalOverlay" id="modalOverlay"></div>
 <svelte:window
-  on:keydown={(e) => {
+  onkeydown={(e) => {
     handleKeydown(e, "Escape", () => {
       snipetModalIsVisible.set(false);
     });

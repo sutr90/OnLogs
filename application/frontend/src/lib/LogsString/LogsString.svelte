@@ -2,18 +2,32 @@
   import { tryToParseLogString } from "../../utils/functions";
   import { chosenStatus } from "../../Stores/stores";
   import fetchApi from "../../utils/fetch";
-  export let status = "";
-  export let time = "";
-  export let message = "";
-  export let width = "";
-  export let isHiglighted = false;
-  export let sharedLinkCallBack = () => {};
-  export let getLogsByTagOptions = {};
 
   import { store } from "../../Stores/stores.js";
+  /**
+   * @typedef {Object} Props
+   * @property {string} [status]
+   * @property {string} [time]
+   * @property {string} [message]
+   * @property {string} [width]
+   * @property {boolean} [isHiglighted]
+   * @property {any} [sharedLinkCallBack]
+   * @property {any} [getLogsByTagOptions]
+   */
+
+  /** @type {Props} */
+  let {
+    status = "",
+    time = "",
+    message = "",
+    width = "",
+    isHiglighted = false,
+    sharedLinkCallBack = () => {},
+    getLogsByTagOptions = {}
+  } = $props();
 
   let activeStatus = "";
-  $: parsedStr = tryToParseLogString(message);
+  let parsedStr = $derived(tryToParseLogString(message));
 </script>
 
 <tr
@@ -23,7 +37,7 @@
   style="width: {width}px"
 >
   <td
-    on:click={async () => {
+    onclick={async () => {
       if ($chosenStatus !== status) {
         chosenStatus.set(status);
       } else {
@@ -42,11 +56,11 @@
         <div
           id={`thumb-shared-${time}`}
           class="shareLinkButtonThumb"
-          on:click={() => {
+          onclick={() => {
             sharedLinkCallBack();
           }}
         >
-          <i class="log log-ShareLink" id={`shared-${time}`} />
+          <i class="log log-ShareLink" id={`shared-${time}`}></i>
         </div>{/if}
     </div>
   </td>

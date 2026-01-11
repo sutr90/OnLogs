@@ -1,21 +1,15 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   // @ts-nocheck
 
   import { each } from "svelte/internal";
   import { onMount } from "svelte";
 
-  export let listData = [];
-  let sortedData = [];
+  let sortedData = $state([]);
   import { navigate } from "svelte-routing";
-  export let openHeaderIndexs = [0];
-  let openStopedServIndexes = [];
-  export let activeElementName = "";
-  export let customListClass = "";
-  export let customListElClass = "";
-  export let customActiveElClass = "";
-  export let headerButton = "";
-  export let listElementButton = "";
-  let chosenElSettings = "";
+  let openStopedServIndexes = $state([]);
+  let chosenElSettings = $state("");
   import {
     activeMenuOption,
     lastChosenHost,
@@ -24,11 +18,34 @@
   } from "../../Stores/stores.js";
   import FetchApi from "../../utils/fetch.js";
   import { changeKey } from "../../utils/changeKey.js";
-  let initialVisitcounter = 0;
+  /**
+   * @typedef {Object} Props
+   * @property {any} [listData]
+   * @property {any} [openHeaderIndexs]
+   * @property {string} [activeElementName]
+   * @property {string} [customListClass]
+   * @property {string} [customListElClass]
+   * @property {string} [customActiveElClass]
+   * @property {string} [headerButton]
+   * @property {string} [listElementButton]
+   */
+
+  /** @type {Props} */
+  let {
+    listData = $bindable([]),
+    openHeaderIndexs = $bindable([0]),
+    activeElementName = $bindable(""),
+    customListClass = "",
+    customListElClass = "",
+    customActiveElClass = "",
+    headerButton = "",
+    listElementButton = ""
+  } = $props();
+  let initialVisitcounter = $state(0);
 
   const fetchApi = new FetchApi();
 
-  $: {
+  run(() => {
     {
       if (!initialVisitcounter && !activeElementName) {
         const chosenHost =
@@ -51,9 +68,9 @@
         );
       }
     }
-  }
+  });
 
-  $: {
+  run(() => {
     sortedData = listData.map((h) => {
       let activeServices = h.services
         .filter((s) => {
@@ -89,9 +106,9 @@
       };
       return newHost;
     });
-  }
+  });
 
-  $: {
+  run(() => {
     if (!initialVisitcounter) {
       const openedStopedServiceIndex = sortedData
         .map((e) => {
@@ -106,7 +123,7 @@
         openStopedServIndexes = [...new Set(openStopedServIndexes)];
       }
     }
-  }
+  });
 
   async function favoriteToggle(host, service) {
     $lastChosenHost, $lastChosenService;
@@ -160,9 +177,9 @@
     });
   }
 
-  $: {
+  run(() => {
     listData && choseInitialHost();
-  }
+  });
 </script>
 
 <div class="listWithChoise {$listScrollIsVisible ? 'active' : ''}">
@@ -171,14 +188,14 @@
       <li class="listElement">
         <div
           class="hostHeader clickable"
-          on:click={({ target }) => {
+          onclick={({ target }) => {
             if (target.id !== headerButton) {
               toggleSublistVisible(index);
             }
           }}
         >
           <div>
-            <i class="log log-Server" />
+            <i class="log log-Server"></i>
           </div>
           <p class="hostName">
             {listEl.host}
@@ -186,11 +203,11 @@
           {#if headerButton}<div
               class="headerButton "
               id={headerButton}
-              on:click={() => {
+              onclick={() => {
                 console.log("clicable");
               }}
             >
-              <i class="log log-{headerButton}" id={headerButton} />
+              <i class="log log-{headerButton}" id={headerButton}></i>
             </div>{/if}
         </div>
         <div
@@ -203,7 +220,7 @@
               {#if !service.isDisabled}<li
                   class="serviceListItem  "
                   id={listEl.host}
-                  on:click={({ target }) => {
+                  onclick={({ target }) => {
                     if (!target.id.includes("heart")) {
                       choseSublistEl(listEl.host, service.serviceName);
                       lastChosenHost.set(listEl.host);
@@ -228,7 +245,7 @@
                       <div class="buttonBox flex">
                         <div
                           class="listElementButton"
-                          on:click={() => {
+                          onclick={() => {
                             navigate(
                               `${changeKey}/servicesettings/${listEl.host.trim()}/${service.serviceName.trim()}`,
                               { replace: true }
@@ -237,12 +254,12 @@
                             chosenElSettings = `${listEl.host.trim()}-${service.serviceName.trim()}`;
                           }}
                         >
-                          <i class="log log-Wheel" />
+                          <i class="log log-Wheel"></i>
                         </div>
                         <div
                           id={`heartButtonCont-${i}`}
                           class="listElementButton"
-                          on:click={() => {
+                          onclick={() => {
                             favoriteToggle(listEl.host, service.serviceName);
                           }}
                         >
@@ -251,7 +268,7 @@
                             class="log {service.isFavorite
                               ? 'log-Heart'
                               : 'log-EmptyHeart'}"
-                          />
+></i>
                         </div>
                       </div>
                     {/if}
@@ -263,7 +280,7 @@
                         ? "active"
                         : ``
                     }`}
-                  />
+></div>
                 </li>
               {/if}{/each}
           </ul>
@@ -275,18 +292,18 @@
             )
               ? ''
               : 'visuallyHidden'}"
-            on:click={() => {
+            onclick={() => {
               toggleArchivedVisible(index);
               initialVisitcounter = 1;
             }}
           >
-            <i class="log log-Archive" />
+            <i class="log log-Archive"></i>
             <p class="stopedServices">stoped services</p>
             <i
               class="log log-Pointer {!openStopedServIndexes.includes(index)
                 ? 'rotated'
                 : ''}"
-            />
+></i>
           </div>
 
           <ul
@@ -300,7 +317,7 @@
               {#if service.isDisabled}<li
                   class="serviceListItem  "
                   id={listEl.host}
-                  on:click={({ target }) => {
+                  onclick={({ target }) => {
                     if (!target.id.includes("heart")) {
                       choseSublistEl(listEl.host, service.serviceName);
                       lastChosenHost.set(listEl.host);
@@ -324,7 +341,7 @@
                       <div class="buttonBox flex">
                         <div
                           class="listElementButton"
-                          on:click={() => {
+                          onclick={() => {
                             navigate(
                               `${changeKey}/servicesettings/${listEl.host.trim()}/${service.serviceName.trim()}`,
                               { replace: true }
@@ -333,12 +350,12 @@
                             chosenElSettings = `${listEl.host.trim()}-${service.serviceName.trim()}`;
                           }}
                         >
-                          <i class="log log-Wheel" />
+                          <i class="log log-Wheel"></i>
                         </div>
                         <div
                           id={`heartButtonContDissabled-${i}`}
                           class="listElementButton"
-                          on:click={() => {
+                          onclick={() => {
                             favoriteToggle(listEl.host, service.serviceName);
                           }}
                         >
@@ -347,7 +364,7 @@
                             class="log {service.isFavorite
                               ? 'log-Heart'
                               : 'log-EmptyHeart'}"
-                          />
+></i>
                         </div>
                       </div>
                     {/if}
@@ -359,7 +376,7 @@
                         ? "active"
                         : ``
                     }`}
-                  />
+></div>
                 </li>{/if}{/each}
           </ul>
         </div>

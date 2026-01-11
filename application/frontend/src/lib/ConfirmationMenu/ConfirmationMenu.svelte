@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import Button from "../Button/Button.svelte";
   import {
     confirmationObj,
@@ -15,9 +17,9 @@
   import fetchApi from "../../utils/fetch.js";
 
   let confirmationWord = "I understand that logs will be lost";
-  let tipsIsVisible = false;
-  let inputValue = "";
-  let error = false;
+  let tipsIsVisible = $state(false);
+  let inputValue = $state("");
+  let error = $state(false);
   function changeMessage(triger) {
     confirmationObj.set({
       ...$confirmationObj,
@@ -61,22 +63,22 @@
     }
   }
 
-  $: {
+  run(() => {
     changeMessage($store.deleteFromDocker);
-  }
+  });
 </script>
 
 <div class="deleteModalContainer">
   <div class="tipsContainer">
     <i
       class="log log-Tips"
-      on:mouseenter={() => {
+      onmouseenter={() => {
         tipsIsVisible = true;
       }}
-      on:mouseleave={() => {
+      onmouseleave={() => {
         tipsIsVisible = false;
       }}
-    />
+></i>
     {#if tipsIsVisible}
       <div class="tipsText container">
         <span class="boldText">Delete Docker logs </span> - when the option is set to 
@@ -152,10 +154,10 @@
     />
   </div>
 </div>
-<div class="modalOverlay" on:click={closeMenu} />
+<div class="modalOverlay" onclick={closeMenu}></div>
 
 <svelte:window
-  on:keydown={({ key }) => {
+  onkeydown={({ key }) => {
     key === "Escape" && closeMenu();
     
   }}

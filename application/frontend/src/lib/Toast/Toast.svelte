@@ -19,10 +19,10 @@
 </script>
 
 <div
-  transition:fly={{ y: -200, duration: 200 }}
+  transition:fly|global={{ y: -200, duration: 200 }}
   class="toastContainer {status}"
 >
-  <div class="toastIcoContainer"><i class="log log-{$toast.status}" /></div>
+  <div class="toastIcoContainer"><i class="log log-{$toast.status}"></i></div>
   <h4>{tittle}</h4>
   <p>{message}</p>
 
@@ -55,7 +55,7 @@
 </div>
 
 <svelte:window
-  on:keydown={(e) => {
+  onkeydown={(e) => {
     handleKeydown(e, "Escape", () => {
       toastIsVisible.set(false);
       if (toastTimeoutId) {

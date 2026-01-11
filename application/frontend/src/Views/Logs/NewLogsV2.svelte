@@ -1,3 +1,5 @@
+<!-- @migration-task Error while migrating Svelte code: `<div>` cannot be a child of `<table>`. `<table>` only allows these children: `<caption>`, `<colgroup>`, `<tbody>`, `<thead>`, `<tfoot>`, `<style>`, `<script>`, `<template>`. The browser will 'repair' the HTML (by moving, removing, or inserting elements) which breaks Svelte's assumptions about the structure of your components.
+https://svelte.dev/e/node_invalid_placement -->
 <script>
   // @ts-nocheck
 
@@ -771,7 +773,7 @@
 <LogsViewHeder bind:searchText />
 {#if pinedDate}<div>
     {#if pinedBadgeIsVisible || endOffLogsIntersect}<div
-        transition:fade={{ duration: 250 }}
+        transition:fade|global={{ duration: 250 }}
         class="timeBudge pined"
       >
         {pinedDate}

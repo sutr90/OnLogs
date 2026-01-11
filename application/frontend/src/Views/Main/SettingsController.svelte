@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onMount } from "svelte";
   import { store } from "../../Stores/stores";
   import fetchApi from "../../utils/fetch";
@@ -22,9 +24,9 @@
     initialSettingsGetted = true;
   });
 
-  $: {
+  run(() => {
     if ($store) {
       saveSettings();
     }
-  }
+  });
 </script>

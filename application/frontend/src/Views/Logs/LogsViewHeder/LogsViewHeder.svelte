@@ -1,12 +1,18 @@
 <script>
-  // @ts-nocheck
+  
 
-  export let searchText = "";
   import Button from "../../../lib/Button/Button.svelte";
   import DropDown from "../../../lib/DropDown/DropDown.svelte";
   import { clickOutside } from "../../../lib/OutsideClicker/OutsideClicker.js";
-  let dropDownIsVisible = false;
-  let isSearchVIsible = false;
+  /**
+   * @typedef {Object} Props
+   * @property {string} [searchText]
+   */
+
+  /** @type {Props} */
+  let { searchText = $bindable("") } = $props();
+  let dropDownIsVisible = $state(false);
+  let isSearchVIsible = $state(false);
   let timer;
   const debounce = (v) => {
     clearTimeout(timer);
@@ -37,7 +43,7 @@
     <div
       style:position={"relative"}
       use:clickOutside
-      on:click_outside={handleClickOutside}
+      onclick_outside={handleClickOutside}
     >
       <Button
         icon={"log log-Eye"}
@@ -73,11 +79,11 @@
   </div>
   <div class="header search {!isSearchVIsible && 'hidden'}">
     {#if !searchText}<div class="searchIcoContainer">
-        <i class={"log log-Search"} />
+        <i class={"log log-Search"}></i>
       </div>{/if}
     <input
       type="text"
-      on:input={(e) => {
+      oninput={(e) => {
         searchText = e.target.value;
       }}
       placeholder="Search"
