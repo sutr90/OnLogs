@@ -3,6 +3,7 @@ package util
 import (
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/devforth/OnLogs/app/vars"
@@ -42,7 +43,7 @@ func TestCreateInitUser(t *testing.T) {
 }
 
 func TestCreateJWT(t *testing.T) {
-	os.Setenv("JWT_SERCRET", "1231efdZF")
+	os.Setenv("JWT_SECRET", "1231efdZF")
 	token := CreateJWT("test_user")
 
 	test_req, _ := http.NewRequest("GET", "", nil)
@@ -74,7 +75,7 @@ func TestGetHost(t *testing.T) {
 }
 
 func TestGetUserFromJWT(t *testing.T) {
-	os.Setenv("JWT_SERCRET", "1231efdZF")
+	os.Setenv("JWT_SECRET", "1231efdZF")
 
 	test_req1, _ := http.NewRequest("GET", "", nil)
 	test_req1.AddCookie(
@@ -87,7 +88,7 @@ func TestGetUserFromJWT(t *testing.T) {
 	test_req2.AddCookie(
 		&http.Cookie{
 			Name:  "onlogs-cookie",
-			Value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdXRob3JpemVkIjp0cnVlLCJleHAiOjE2NzU4NDU4MDAsInVzZXIiOiJ0ZXN0X3VzZXIifQ.eqlUc3XkL8u-icC-2nihIrh1IedWP-cC9ewa4OI7wBg",
+			Value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdXRob3JpemVkIjp0cnVlLCJleHAiOjE3NjgwNzcxMjcsInVzZXIiOiJ0ZXN0X3VzZXIifQ.KOplTT3L13v68qda3Z0_F0ZYjqn__wq2kcji7dLnuUE",
 		},
 	)
 
@@ -99,7 +100,7 @@ func TestGetUserFromJWT(t *testing.T) {
 	}
 
 	_, err := GetUserFromJWT(*test_req2)
-	if err.Error() != "Token is expired" {
+	if err == nil || !strings.Contains(err.Error(), "expired") {
 		t.Error("Token should be expired")
 	}
 

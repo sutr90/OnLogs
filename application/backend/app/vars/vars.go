@@ -23,7 +23,7 @@ var (
 	AgentsActiveContainers = map[string][]string{}
 
 	ToDelete    = map[string][]string{}
-	Connections = map[string][]websocket.Conn{}
+	Connections = map[string][]*websocket.Conn{}
 
 	Counters_For_Hosts_Last_30_Min = map[string]map[string]uint64{}
 	Container_Stat_Counter         = map[string]map[string]uint64{}
