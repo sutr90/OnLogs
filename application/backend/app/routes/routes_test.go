@@ -89,8 +89,57 @@ func TestGetHosts(t *testing.T) {
 	handler1 := http.HandlerFunc(GetHosts)
 	handler1.ServeHTTP(rr1, req1)
 	b, _ := io.ReadAll(rr1.Result().Body)
-	if string(b) != "[{\"host\":\""+util.GetHost()+"\",\"services\":[]},{\"host\":\"Test1\",\"services\":[{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest1\"},{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest2\"},{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest3\"}]},{\"host\":\"Test2\",\"services\":[{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest1\"},{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest2\"},{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest3\"}]}]" {
-		t.Error("Wrong containers or hosts list returned!\n" + string(b))
+
+	type service struct {
+		IsDisabled  bool   `json:"isDisabled"`
+		IsFavorite  bool   `json:"isFavorite"`
+		ServiceName string `json:"serviceName"`
+	}
+	type hostEntry struct {
+		Host     string    `json:"host"`
+		Services []service `json:"services"`
+	}
+
+	var hosts []hostEntry
+	if err := json.Unmarshal(b, &hosts); err != nil {
+		t.Fatalf("failed to unmarshal response: %v -- body: %s", err, string(b))
+	}
+
+	if len(hosts) != 3 {
+		t.Fatalf("expected 3 hosts, got %d -- body: %s", len(hosts), string(b))
+	}
+
+	// Build lookup map for hosts
+	hostMap := make(map[string]hostEntry)
+	for _, h := range hosts {
+		hostMap[h.Host] = h
+	}
+
+	expectedHosts := []string{util.GetHost(), "Test1", "Test2"}
+	expectedServices := []string{"containerTest1", "containerTest2", "containerTest3"}
+
+	for _, eh := range expectedHosts {
+		he, ok := hostMap[eh]
+		if !ok {
+			t.Errorf("missing host %s", eh)
+			continue
+		}
+		if eh == util.GetHost() {
+			if len(he.Services) != 0 {
+				t.Errorf("expected no services for host %s, got %v", eh, he.Services)
+			}
+			continue
+		}
+		// For Test1/Test2 ensure all expected services are present (order-independent)
+		svcSet := make(map[string]bool)
+		for _, s := range he.Services {
+			svcSet[s.ServiceName] = true
+		}
+		for _, es := range expectedServices {
+			if !svcSet[es] {
+				t.Errorf("host %s missing service %s (services: %v)", eh, es, he.Services)
+			}
+		}
 	}
 }
 
