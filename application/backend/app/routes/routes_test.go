@@ -11,18 +11,32 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devforth/OnLogs/app/daemon"
+	"github.com/devforth/OnLogs/app/docker"
 	"github.com/devforth/OnLogs/app/userdb"
 	"github.com/devforth/OnLogs/app/util"
 	"github.com/devforth/OnLogs/app/vars"
 	"github.com/joho/godotenv"
+	"github.com/moby/moby/client"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
 func initTestConfig() *RouteController {
+	cli, _ := client.New(client.FromEnv)
+	defer cli.Close()
+
+	dockerService := &docker.DockerService{
+		Client: cli,
+	}
+
+	daemonService := &daemon.DaemonService{
+		DockerClient: dockerService,
+	}
+
     // Initialize the "Controller" with its dependencies
     routerCtrl := &RouteController{
-        DockerService: nil,
-		DaemonService: nil,
+        DockerService: dockerService,
+		DaemonService: daemonService,
     }
 	return routerCtrl
 }
@@ -77,11 +91,11 @@ func TestCheckCookie(t *testing.T) {
 }
 
 func TestGetHosts(t *testing.T) {
-	ctrl := initTestConfig()
 	err := godotenv.Load("../../.env")
 	if err != nil {
-		os.Setenv("DOCKER_SOCKET_PATH", "localhost:2375")
+		os.Setenv("DOCKER_HOST", "tcp://localhost:2375")
 	}
+	ctrl := initTestConfig()
 
 	os.RemoveAll("leveldb/hosts")
 	os.MkdirAll("leveldb/hosts/Test1/containers/containerTest1", 0700)

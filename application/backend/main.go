@@ -30,8 +30,8 @@ func init_config() {
 		os.Setenv("JWT_SECRET", string(token))
 	}
 
-	if os.Getenv("DOCKER_SOCKET_PATH") == "" {
-		os.Setenv("DOCKER_SOCKET_PATH", "/var/run/docker.sock")
+	if os.Getenv("DOCKER_HOST") == "" {
+		os.Setenv("DOCKER_HOST", "/var/run/docker.sock")
 	}
 
 	if os.Getenv("MAX_LOGS_SIZE") == "" {
@@ -52,13 +52,14 @@ func main() {
 		Client: cli,
 	}
 
-		daemonService := &daemon.DaemonService{
+	daemonService := &daemon.DaemonService{
 		DockerClient: dockerService,
 	}
 
 	streamController := &streamer.StreamController{
 		DaemonService: daemonService,
 	}
+
 	bgContext := context.Background()
 	
 	if os.Getenv("AGENT") != "" {
