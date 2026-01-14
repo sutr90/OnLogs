@@ -67,7 +67,7 @@ func TestCheckCookie(t *testing.T) {
 func TestGetHosts(t *testing.T) {
 	err := godotenv.Load("../../.env")
 	if err != nil {
-		os.Setenv("DOCKER_SOCKET_PATH", "/var/run/docker.sock")
+		os.Setenv("DOCKER_SOCKET_PATH", "localhost:2375")
 	}
 
 	os.RemoveAll("leveldb/hosts")

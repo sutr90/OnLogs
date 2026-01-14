@@ -152,7 +152,7 @@ func CreateDaemonToDBStream(containerName string) {
 
 // make request to docker socket
 func makeSocketRequest(path string) []byte {
-	connection, err := net.Dial("unix", os.Getenv("DOCKER_SOCKET_PATH"))
+	connection, err := net.Dial("tcp", os.Getenv("DOCKER_SOCKET_PATH"))
 	if err != nil {
 		panic(err)
 	}
