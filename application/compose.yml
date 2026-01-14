@@ -1,0 +1,13 @@
+name: OnLogs
+services:
+    docker-socket-proxy:
+        container_name: docker-proxy
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        ports:
+            - 127.0.0.1:2375:2375
+        environment:
+            - POST=0
+            - DELETE=0
+            - PUT=0
+        image: tecnativa/docker-socket-proxy
