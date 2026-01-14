@@ -2,9 +2,9 @@ package daemon
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"strconv"
@@ -13,10 +13,15 @@ import (
 
 	"github.com/devforth/OnLogs/app/agent"
 	"github.com/devforth/OnLogs/app/containerdb"
+	"github.com/devforth/OnLogs/app/docker"
 	"github.com/devforth/OnLogs/app/util"
 	"github.com/devforth/OnLogs/app/vars"
 	"github.com/syndtr/goleveldb/leveldb"
 )
+
+type DaemonService struct {
+    DockerClient *docker.DockerService
+}
 
 func createLogMessage(db *leveldb.DB, host string, container string, message string) string {
 	datetime := strings.Replace(strings.Split(time.Now().UTC().String(), " +")[0], " ", "T", 1)
@@ -150,27 +155,12 @@ func CreateDaemonToDBStream(containerName string) {
 	}
 }
 
-// make request to docker socket
-func makeSocketRequest(path string) []byte {
-	connection, err := net.Dial("tcp", os.Getenv("DOCKER_SOCKET_PATH"))
-	if err != nil {
-		panic(err)
-	}
-	fmt.Fprintf(connection, "GET /"+path+" HTTP/1.0\r\n\r\n")
-
-	body, _ := io.ReadAll(connection)
-
-	connection.Close()
-	return body
-}
-
 // returns list of names of docker containers from docker daemon
-func GetContainersList() []string {
-	var result []map[string]any
-
-	body := string(makeSocketRequest("containers/json"))
-	body = strings.Split(body, "\r\n\r\n")[1]
-	json.Unmarshal([]byte(body), &result)
+func (h *DaemonService) GetContainersList(ctx context.Context) []string {
+	result, err := h.DockerClient.GetContainerNames(ctx)
+	if err != nil {
+        panic(err)
+    }
 
 	var names []string
 
@@ -184,9 +174,9 @@ func GetContainersList() []string {
 	}
 	containersMetaDB = vars.ContainersMeta_DBs[util.GetHost()]
 
-	for i := 0; i < len(result); i++ {
-		name := fmt.Sprintf("%v", result[i]["Names"].([]interface{})[0].(string))[1:]
-		id := result[i]["Id"].(string)
+	for i := range result {
+		name := result[i].Name
+		id := result[i].ID
 
 		names = append(names, name)
 		containersMetaDB.Put([]byte(name), []byte(id), nil)
@@ -195,16 +185,11 @@ func GetContainersList() []string {
 	return names
 }
 
-func GetContainerImageNameByContainerID(containerID string) string {
-	body := string(makeSocketRequest("containers/" + containerID + "/json"))
-	body = strings.Split(body, "\r\n\r\n")[1]
-	var result map[string]any
-	json.Unmarshal([]byte(body), &result)
+func (h *DaemonService) GetContainerImageNameByContainerID(ctx context.Context, containerID string) string {
+	result, err := h.DockerClient.GetContainerImageNameByContainerID(ctx, containerID)
+	if err != nil {
+        return ""
+    }
 
-	if result["Config"] == nil {
-		return ""
-	}
-
-	imageName := fmt.Sprintf("%v", result["Config"].(map[string]any)["Image"])
-	return imageName
+	return result
 }
