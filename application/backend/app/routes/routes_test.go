@@ -17,12 +17,12 @@ import (
 	"github.com/devforth/OnLogs/app/util"
 	"github.com/devforth/OnLogs/app/vars"
 	"github.com/joho/godotenv"
-	"github.com/moby/moby/client"
+	"github.com/docker/docker/client"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
 func initTestConfig() *RouteController {
-	cli, _ := client.New(client.FromEnv)
+	cli, _ := client.NewClientWithOpts(client.FromEnv)
 	defer cli.Close()
 
 	dockerService := &docker.DockerService{

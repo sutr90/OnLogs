@@ -10,4 +10,6 @@ services:
             - POST=0
             - DELETE=0
             - PUT=0
+            - GET=1
+            - CONTAINERS=1
         image: tecnativa/docker-socket-proxy

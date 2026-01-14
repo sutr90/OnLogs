@@ -3,7 +3,8 @@ package docker
 import (
 	"context"
 
-	"github.com/moby/moby/client"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
 )
 
 type DockerService struct {
@@ -16,13 +17,13 @@ type ContainerNamesResult struct {
 }
 
 func (s *DockerService) GetContainerNames(ctx context.Context) ([]ContainerNamesResult, error) {
-    containers, err := s.Client.ContainerList(ctx, client.ContainerListOptions{All: true})
+    containers, err := s.Client.ContainerList(ctx, container.ListOptions{All: true})
     if err != nil {
         return nil, err
     }
     
     var res []ContainerNamesResult
-    for _, c := range containers.Items {
+    for _, c := range containers {
 		res = append(res, ContainerNamesResult{Name: c.Names[0], ID: c.ID})
     }
     return res, nil
@@ -30,10 +31,10 @@ func (s *DockerService) GetContainerNames(ctx context.Context) ([]ContainerNames
 
 
 func (s *DockerService) GetContainerImageNameByContainerID(ctx context.Context, containerID string) (string, error) {
-    res, err := s.Client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+    res, err := s.Client.ContainerInspect(ctx, containerID)
     if err != nil {
         return "", err
     }
     
-    return res.Container.Image, nil
+    return res.Config.Image, nil
 }

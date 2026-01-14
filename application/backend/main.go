@@ -12,8 +12,8 @@ import (
 	"github.com/devforth/OnLogs/app/routes"
 	"github.com/devforth/OnLogs/app/streamer"
 	"github.com/devforth/OnLogs/app/util"
+	"github.com/docker/docker/client"
 	"github.com/joho/godotenv"
-	"github.com/moby/moby/client"
 )
 
 func init_config() {
@@ -45,7 +45,7 @@ func main() {
 	godotenv.Load(".env")
 	init_config()
 
-	cli, _ := client.New(client.FromEnv)
+	cli, _ := client.NewClientWithOpts(client.FromEnv)
 	defer cli.Close()
 
 	dockerService := &docker.DockerService{
