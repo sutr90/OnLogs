@@ -139,8 +139,10 @@ func (h *RouteController)AddLogLine(w http.ResponseWriter, req *http.Request) {
 	}
 
 	to_send, _ := json.Marshal([]string{logItem.LogLine[0], logItem.LogLine[1]})
-	for _, c := range vars.Connections[logItem.Host+"/"+logItem.Container] {
-		c.WriteMessage(1, to_send)
+	conns := vars.Connections[logItem.Host+"/"+logItem.Container]
+	for i := range conns {
+		c := conns[i]
+		c.WriteMessage(websocket.TextMessage, to_send)
 	}
 }
 
@@ -495,7 +497,7 @@ func (h *RouteController)GetLogsStream(w http.ResponseWriter, req *http.Request)
 	if err != nil {
 		fmt.Println(err)
 	}
-	vars.Connections[container] = append(vars.Connections[container], *ws)
+	vars.Connections[container] = append(vars.Connections[container], ws)
 }
 
 func (h *RouteController)Login(w http.ResponseWriter, req *http.Request) {

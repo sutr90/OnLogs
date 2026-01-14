@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -43,15 +44,6 @@ func init_config() {
 func main() {
 	godotenv.Load(".env")
 	init_config()
-	if os.Getenv("AGENT") != "" {
-		streamer.StreamLogs()
-	}
-
-	go db.DeleteUnusedTokens()
-	go streamer.StreamLogs()
-	// go util.RunSpaceMonitoring()
-	util.ReplacePrefixVariableForFrontend()
-	util.CreateInitUser()
 
 	cli, _ := client.New(client.FromEnv)
 	defer cli.Close()
@@ -60,9 +52,24 @@ func main() {
 		Client: cli,
 	}
 
-	daemonService := &daemon.DaemonService{
+		daemonService := &daemon.DaemonService{
 		DockerClient: dockerService,
 	}
+
+	streamController := &streamer.StreamController{
+		DaemonService: daemonService,
+	}
+	bgContext := context.Background()
+	
+	if os.Getenv("AGENT") != "" {
+		streamController.StreamLogs(bgContext)
+	}
+
+	go db.DeleteUnusedTokens()
+	go streamController.StreamLogs(bgContext)
+	// go util.RunSpaceMonitoring()
+	util.ReplacePrefixVariableForFrontend()
+	util.CreateInitUser()
 
     // Initialize the "Controller" with its dependencies
     routerCtrl := &routes.RouteController{

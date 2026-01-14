@@ -1,6 +1,7 @@
 package streamer
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -12,6 +13,10 @@ import (
 	"github.com/devforth/OnLogs/app/util"
 	"github.com/devforth/OnLogs/app/vars"
 )
+
+type StreamController struct {
+	DaemonService *daemon.DaemonService
+}
 
 func createStreams(containers []string) {
 	for _, container := range vars.DockerContainers {
@@ -27,13 +32,13 @@ func createStreams(containers []string) {
 	}
 }
 
-func StreamLogs() {
+func (ctrl *StreamController) StreamLogs(ctx context.Context) {
 	if vars.FavsDBErr != nil || vars.StateDBErr != nil || vars.UsersDBErr != nil {
 		fmt.Println("ERROR: unable to open leveldb", vars.FavsDBErr, vars.StateDBErr, vars.UsersDBErr)
 		return
 	}
 
-	vars.DockerContainers = daemon.GetContainersList()
+	vars.DockerContainers = ctrl.DaemonService.GetContainersList(ctx)
 	if os.Getenv("AGENT") != "" {
 		agent.SendInitRequest(vars.DockerContainers)
 	}
@@ -41,7 +46,7 @@ func StreamLogs() {
 		createStreams(vars.DockerContainers)
 		time.Sleep(20 * time.Second)
 		vars.Year = strconv.Itoa(time.Now().UTC().Year())
-		vars.DockerContainers = daemon.GetContainersList()
+		vars.DockerContainers = ctrl.DaemonService.GetContainersList(ctx)
 		if os.Getenv("AGENT") != "" {
 			agent.SendUpdate(vars.DockerContainers)
 			agent.TryResend()
