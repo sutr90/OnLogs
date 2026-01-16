@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -16,11 +16,12 @@ import (
 	"github.com/devforth/OnLogs/app/docker"
 	"github.com/devforth/OnLogs/app/util"
 	"github.com/devforth/OnLogs/app/vars"
+	"github.com/docker/docker/api/types/container"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
 type DaemonService struct {
-    DockerClient *docker.DockerService
+	DockerClient *docker.DockerService
 }
 
 func createLogMessage(db *leveldb.DB, host string, container string, message string) string {
@@ -45,25 +46,6 @@ func validateMessage(message string) (string, bool) {
 	return message, true
 }
 
-func createConnection(containerName string) net.Conn {
-	connection, _ := net.Dial("unix", os.Getenv("DOCKER_SOCKET_PATH"))
-	fmt.Fprintf(
-		connection,
-		"GET /containers/"+containerName+"/logs?stdout=true&stderr=true&timestamps=true&follow=true&since="+strconv.FormatInt(time.Now().Add(-5*time.Second).Unix(), 10)+" HTTP/1.0\r\n\r\n",
-	)
-	return connection
-}
-
-func readHeader(reader bufio.Reader) {
-	for { // reading resp header
-		tmp, _ := reader.ReadString('\n')
-		if tmp[:len(tmp)-2] == "" {
-			reader.ReadString('\n')
-			break
-		}
-	}
-}
-
 func closeActiveStream(containerName string) {
 	newDaemonStreams := []string{}
 	for _, stream := range vars.Active_Daemon_Streams {
@@ -78,10 +60,15 @@ func closeActiveStream(containerName string) {
 	vars.Active_Daemon_Streams = newDaemonStreams
 }
 
-func CreateDaemonToHostStream(containerName string) {
-	connection := createConnection(containerName)
-	reader := bufio.NewReader(connection)
-	readHeader(*reader)
+func (h *DaemonService) CreateDaemonToHostStream(ctx context.Context, containerName string) {
+	rc, err := h.DockerClient.Client.ContainerLogs(ctx, containerName, container.LogsOptions{ShowStdout: true, ShowStderr: true, Timestamps: true, Follow: true, Since: strconv.FormatInt(time.Now().Add(-5*time.Second).Unix(), 10)})
+	if err != nil {
+		closeActiveStream(containerName)
+		return
+	}
+	defer rc.Close()
+
+	reader := bufio.NewReader(rc)
 
 	host := util.GetHost()
 	token := os.Getenv("ONLOGS_TOKEN")
@@ -89,8 +76,13 @@ func CreateDaemonToHostStream(containerName string) {
 
 	lastSleep := time.Now().Unix()
 	for { // reading body
-		logLine, get_string_error := reader.ReadString('\n') // TODO read bytes instead of strings
+		logLine, get_string_error := reader.ReadString('\n')
 		if get_string_error != nil {
+			if get_string_error == io.EOF {
+				closeActiveStream(containerName)
+				agent.SendLogMessage(token, containerName, strings.SplitN(createLogMessage(nil, host, containerName, "ONLOGS: Container listening stopped! (EOF)"), " ", 2))
+				return
+			}
 			closeActiveStream(containerName)
 			agent.SendLogMessage(token, containerName, strings.SplitN(createLogMessage(nil, host, containerName, "ONLOGS: Container listening stopped! ("+get_string_error.Error()+")"), " ", 2))
 			return
@@ -111,10 +103,15 @@ func CreateDaemonToHostStream(containerName string) {
 }
 
 // creates stream that writes logs from every docker container to leveldb
-func CreateDaemonToDBStream(containerName string) {
-	connection := createConnection(containerName)
-	reader := bufio.NewReader(connection)
-	readHeader(*reader)
+func (h *DaemonService) CreateDaemonToDBStream(ctx context.Context, containerName string) {
+	rc, err := h.DockerClient.Client.ContainerLogs(ctx, containerName, container.LogsOptions{ShowStdout: true, ShowStderr: true, Timestamps: true, Follow: true, Since: strconv.FormatInt(time.Now().Add(-5*time.Second).Unix(), 10)})
+	if err != nil {
+		closeActiveStream(containerName)
+		return
+	}
+	defer rc.Close()
+
+	reader := bufio.NewReader(rc)
 
 	host := util.GetHost()
 	current_db := util.GetDB(host, containerName, "logs")
@@ -124,6 +121,11 @@ func CreateDaemonToDBStream(containerName string) {
 	for { // reading body
 		logLine, get_string_error := reader.ReadString('\n')
 		if get_string_error != nil {
+			if get_string_error == io.EOF {
+				closeActiveStream(containerName)
+				createLogMessage(current_db, host, containerName, "ONLOGS: Container listening stopped! (EOF)")
+				return
+			}
 			closeActiveStream(containerName)
 			createLogMessage(current_db, host, containerName, "ONLOGS: Container listening stopped! ("+get_string_error.Error()+")")
 			return
@@ -159,8 +161,8 @@ func CreateDaemonToDBStream(containerName string) {
 func (h *DaemonService) GetContainersList(ctx context.Context) []string {
 	result, err := h.DockerClient.GetContainerNames(ctx)
 	if err != nil {
-        panic(err)
-    }
+		panic(err)
+	}
 
 	var names []string
 
@@ -188,8 +190,8 @@ func (h *DaemonService) GetContainersList(ctx context.Context) []string {
 func (h *DaemonService) GetContainerImageNameByContainerID(ctx context.Context, containerID string) string {
 	result, err := h.DockerClient.GetContainerImageNameByContainerID(ctx, containerID)
 	if err != nil {
-        return ""
-    }
+		return ""
+	}
 
 	return result
 }

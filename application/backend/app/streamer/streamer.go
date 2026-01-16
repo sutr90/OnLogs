@@ -18,15 +18,15 @@ type StreamController struct {
 	DaemonService *daemon.DaemonService
 }
 
-func createStreams(containers []string) {
+func (ctrl *StreamController) createStreams(ctx context.Context, containers []string) {
 	for _, container := range vars.DockerContainers {
 		if !util.Contains(container, vars.Active_Daemon_Streams) {
 			go statistics.RunStatisticForContainer(util.GetHost(), container)
 			vars.Active_Daemon_Streams = append(vars.Active_Daemon_Streams, container)
 			if os.Getenv("AGENT") != "" {
-				go daemon.CreateDaemonToHostStream(container)
+				go ctrl.DaemonService.CreateDaemonToHostStream(ctx, container)
 			} else {
-				go daemon.CreateDaemonToDBStream(container)
+				go ctrl.DaemonService.CreateDaemonToDBStream(ctx, container)
 			}
 		}
 	}
@@ -43,7 +43,7 @@ func (ctrl *StreamController) StreamLogs(ctx context.Context) {
 		agent.SendInitRequest(vars.DockerContainers)
 	}
 	for {
-		createStreams(vars.DockerContainers)
+		ctrl.createStreams(ctx, vars.DockerContainers)
 		time.Sleep(20 * time.Second)
 		vars.Year = strconv.Itoa(time.Now().UTC().Year())
 		vars.DockerContainers = ctrl.DaemonService.GetContainersList(ctx)

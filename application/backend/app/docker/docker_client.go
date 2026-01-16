@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -24,7 +25,11 @@ func (s *DockerService) GetContainerNames(ctx context.Context) ([]ContainerNames
     
     var res []ContainerNamesResult
     for _, c := range containers {
-		res = append(res, ContainerNamesResult{Name: c.Names[0], ID: c.ID})
+        name := ""
+        if len(c.Names) > 0 {
+            name = strings.TrimPrefix(c.Names[0], "/")
+        }
+        res = append(res, ContainerNamesResult{Name: name, ID: c.ID})
     }
     return res, nil
 }

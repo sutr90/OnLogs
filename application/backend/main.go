@@ -31,7 +31,7 @@ func init_config() {
 	}
 
 	if os.Getenv("DOCKER_HOST") == "" {
-		os.Setenv("DOCKER_HOST", "/var/run/docker.sock")
+		os.Setenv("DOCKER_HOST", "tcp://localhost:2375")
 	}
 
 	if os.Getenv("MAX_LOGS_SIZE") == "" {
@@ -61,7 +61,7 @@ func main() {
 	}
 
 	bgContext := context.Background()
-	
+
 	if os.Getenv("AGENT") != "" {
 		streamController.StreamLogs(bgContext)
 	}
@@ -72,11 +72,11 @@ func main() {
 	util.ReplacePrefixVariableForFrontend()
 	util.CreateInitUser()
 
-    // Initialize the "Controller" with its dependencies
-    routerCtrl := &routes.RouteController{
-        DockerService: dockerService,
+	// Initialize the "Controller" with its dependencies
+	routerCtrl := &routes.RouteController{
+		DockerService: dockerService,
 		DaemonService: daemonService,
-    }
+	}
 
 	pathPrefix := os.Getenv("ONLOGS_PATH_PREFIX")
 	http.HandleFunc(pathPrefix+"/", routerCtrl.Frontend)
