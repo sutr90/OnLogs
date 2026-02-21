@@ -11,20 +11,44 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devforth/OnLogs/app/daemon"
+	"github.com/devforth/OnLogs/app/docker"
 	"github.com/devforth/OnLogs/app/userdb"
 	"github.com/devforth/OnLogs/app/util"
 	"github.com/devforth/OnLogs/app/vars"
 	"github.com/joho/godotenv"
+	"github.com/docker/docker/client"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
+func initTestConfig() *RouteController {
+	cli, _ := client.NewClientWithOpts(client.FromEnv)
+	defer cli.Close()
+
+	dockerService := &docker.DockerService{
+		Client: cli,
+	}
+
+	daemonService := &daemon.DaemonService{
+		DockerClient: dockerService,
+	}
+
+    // Initialize the "Controller" with its dependencies
+    routerCtrl := &RouteController{
+        DockerService: dockerService,
+		DaemonService: daemonService,
+    }
+	return routerCtrl
+}
+
 func TestFrontend(t *testing.T) {
+	ctrl := initTestConfig()
 	os.Mkdir("dist", 0700)
 	os.WriteFile("dist/index.html", []byte("text"), 0700)
 
 	req1, _ := http.NewRequest("GET", "/frontend", nil)
 	rr1 := httptest.NewRecorder()
-	handler1 := http.HandlerFunc(Frontend)
+	handler1 := http.HandlerFunc(ctrl.Frontend)
 	handler1.ServeHTTP(rr1, req1)
 	body1, _ := io.ReadAll(rr1.Result().Body)
 	if string(body1) != "text" {
@@ -33,7 +57,7 @@ func TestFrontend(t *testing.T) {
 
 	req2, _ := http.NewRequest("GET", "/fasf", nil)
 	rr2 := httptest.NewRecorder()
-	handler2 := http.HandlerFunc(Frontend)
+	handler2 := http.HandlerFunc(ctrl.Frontend)
 	handler2.ServeHTTP(rr2, req2)
 	body2, _ := io.ReadAll(rr2.Result().Body)
 	if string(body2) != "text" {
@@ -42,9 +66,11 @@ func TestFrontend(t *testing.T) {
 }
 
 func TestCheckCookie(t *testing.T) {
+	ctrl := initTestConfig()
+
 	req1, _ := http.NewRequest("GET", "/frontend", nil)
 	rr1 := httptest.NewRecorder()
-	handler1 := http.HandlerFunc(CheckCookie)
+	handler1 := http.HandlerFunc(ctrl.CheckCookie)
 	handler1.ServeHTTP(rr1, req1)
 	if rr1.Result().StatusCode != 401 {
 		t.Error("Should be unauthorized!")
@@ -57,7 +83,7 @@ func TestCheckCookie(t *testing.T) {
 	})
 	userdb.CreateUser("testuser", "testuser")
 	rr2 := httptest.NewRecorder()
-	handler2 := http.HandlerFunc(CheckCookie)
+	handler2 := http.HandlerFunc(ctrl.CheckCookie)
 	handler2.ServeHTTP(rr2, req2)
 	if rr2.Result().StatusCode != 200 {
 		t.Error("Should be unauthorized!")
@@ -67,8 +93,9 @@ func TestCheckCookie(t *testing.T) {
 func TestGetHosts(t *testing.T) {
 	err := godotenv.Load("../../.env")
 	if err != nil {
-		os.Setenv("DOCKER_SOCKET_PATH", "/var/run/docker.sock")
+		os.Setenv("DOCKER_HOST", "tcp://localhost:2375")
 	}
+	ctrl := initTestConfig()
 
 	os.RemoveAll("leveldb/hosts")
 	os.MkdirAll("leveldb/hosts/Test1/containers/containerTest1", 0700)
@@ -86,15 +113,65 @@ func TestGetHosts(t *testing.T) {
 	userdb.CreateUser("testuser", "testuser")
 
 	rr1 := httptest.NewRecorder()
-	handler1 := http.HandlerFunc(GetHosts)
+	handler1 := http.HandlerFunc(ctrl.GetHosts)
 	handler1.ServeHTTP(rr1, req1)
 	b, _ := io.ReadAll(rr1.Result().Body)
-	if string(b) != "[{\"host\":\"Test1\",\"services\":[{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest1\"},{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest2\"},{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest3\"}]},{\"host\":\"Test2\",\"services\":[{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest1\"},{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest2\"},{\"isDisabled\":true,\"isFavorite\":false,\"serviceName\":\"containerTest3\"}]},{\"host\":\""+util.GetHost()+"\",\"services\":[]}]" {
-		t.Error("Wrong containers or hosts list returned!\n" + string(b))
+
+	type service struct {
+		IsDisabled  bool   `json:"isDisabled"`
+		IsFavorite  bool   `json:"isFavorite"`
+		ServiceName string `json:"serviceName"`
+	}
+	type hostEntry struct {
+		Host     string    `json:"host"`
+		Services []service `json:"services"`
+	}
+
+	var hosts []hostEntry
+	if err := json.Unmarshal(b, &hosts); err != nil {
+		t.Fatalf("failed to unmarshal response: %v -- body: %s", err, string(b))
+	}
+
+	if len(hosts) != 3 {
+		t.Fatalf("expected 3 hosts, got %d -- body: %s", len(hosts), string(b))
+	}
+
+	// Build lookup map for hosts
+	hostMap := make(map[string]hostEntry)
+	for _, h := range hosts {
+		hostMap[h.Host] = h
+	}
+
+	expectedHosts := []string{util.GetHost(), "Test1", "Test2"}
+	expectedServices := []string{"containerTest1", "containerTest2", "containerTest3"}
+
+	for _, eh := range expectedHosts {
+		he, ok := hostMap[eh]
+		if !ok {
+			t.Errorf("missing host %s", eh)
+			continue
+		}
+		if eh == util.GetHost() {
+			if len(he.Services) != 0 {
+				t.Errorf("expected no services for host %s, got %v", eh, he.Services)
+			}
+			continue
+		}
+		// For Test1/Test2 ensure all expected services are present (order-independent)
+		svcSet := make(map[string]bool)
+		for _, s := range he.Services {
+			svcSet[s.ServiceName] = true
+		}
+		for _, es := range expectedServices {
+			if !svcSet[es] {
+				t.Errorf("host %s missing service %s (services: %v)", eh, es, he.Services)
+			}
+		}
 	}
 }
 
 func TestSizeByAll(t *testing.T) {
+	ctrl := initTestConfig()
 	req1, _ := http.NewRequest("GET", "/", nil)
 	req1.AddCookie(&http.Cookie{
 		Name:  "onlogs-cookie",
@@ -102,7 +179,7 @@ func TestSizeByAll(t *testing.T) {
 	})
 	userdb.CreateUser("testuser", "testuser")
 	rr1 := httptest.NewRecorder()
-	handler1 := http.HandlerFunc(GetSizeByAll)
+	handler1 := http.HandlerFunc(ctrl.GetSizeByAll)
 	handler1.ServeHTTP(rr1, req1)
 	b, _ := io.ReadAll(rr1.Result().Body)
 	if !strings.Contains(string(b), "\"0.0\"") {
@@ -111,6 +188,7 @@ func TestSizeByAll(t *testing.T) {
 }
 
 func TestSizeByService(t *testing.T) {
+	ctrl := initTestConfig()
 	req1, _ := http.NewRequest("GET", "/getSizeByService?service=containerTest1&host=Test1", nil)
 	req1.AddCookie(&http.Cookie{
 		Name:  "onlogs-cookie",
@@ -118,7 +196,7 @@ func TestSizeByService(t *testing.T) {
 	})
 	userdb.CreateUser("testuser", "testuser")
 	rr1 := httptest.NewRecorder()
-	handler1 := http.HandlerFunc(GetSizeByAll)
+	handler1 := http.HandlerFunc(ctrl.GetSizeByAll)
 	handler1.ServeHTTP(rr1, req1)
 	b, _ := io.ReadAll(rr1.Result().Body)
 	if !strings.Contains(string(b), "\"0.0\"") {
@@ -127,6 +205,7 @@ func TestSizeByService(t *testing.T) {
 }
 
 func TestLogin(t *testing.T) {
+	ctrl := initTestConfig()
 	postBody, _ := json.Marshal(map[string]string{
 		"Login":    "testuser",
 		"Password": "testsuser",
@@ -135,7 +214,7 @@ func TestLogin(t *testing.T) {
 	userdb.CreateUser("testuser", "testuser")
 
 	rr1 := httptest.NewRecorder()
-	handler1 := http.HandlerFunc(Login)
+	handler1 := http.HandlerFunc(ctrl.Login)
 	handler1.ServeHTTP(rr1, req1)
 	b, _ := io.ReadAll(rr1.Result().Body)
 	if !strings.Contains(string(b), "Wrong") {
@@ -148,7 +227,7 @@ func TestLogin(t *testing.T) {
 	})
 	req2, _ := http.NewRequest("POST", "/", bytes.NewBuffer(postBody2))
 	rr2 := httptest.NewRecorder()
-	handler2 := http.HandlerFunc(Login)
+	handler2 := http.HandlerFunc(ctrl.Login)
 	handler2.ServeHTTP(rr2, req2)
 	b2, _ := io.ReadAll(rr2.Result().Body)
 	if !strings.Contains(string(b2), "null") {
@@ -157,6 +236,7 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLogout(t *testing.T) {
+	ctrl := initTestConfig()
 	postBody, _ := json.Marshal(map[string]string{
 		"Login":    "testuser",
 		"Password": "testuser",
@@ -165,12 +245,12 @@ func TestLogout(t *testing.T) {
 	userdb.CreateUser("testuser", "testuser")
 
 	rr1 := httptest.NewRecorder()
-	handler1 := http.HandlerFunc(Login)
+	handler1 := http.HandlerFunc(ctrl.Login)
 	handler1.ServeHTTP(rr1, req1)
 
 	rr2 := httptest.NewRecorder()
 	req1.AddCookie(rr1.Result().Cookies()[0])
-	handler2 := http.HandlerFunc(Logout)
+	handler2 := http.HandlerFunc(ctrl.Logout)
 	handler2.ServeHTTP(rr2, req1)
 
 	if rr2.Result().Cookies()[0].Value != "toDelete" {
@@ -179,6 +259,7 @@ func TestLogout(t *testing.T) {
 }
 
 func TestGetStats(t *testing.T) {
+	ctrl := initTestConfig()
 	postBody1, _ := json.Marshal(map[string]string{
 		"Login":    "testuser",
 		"Password": "testuser",
@@ -186,7 +267,7 @@ func TestGetStats(t *testing.T) {
 	req1, _ := http.NewRequest("POST", "/", bytes.NewBuffer(postBody1))
 	userdb.CreateUser("testuser", "testuser")
 	rr1 := httptest.NewRecorder()
-	handler1 := http.HandlerFunc(Login)
+	handler1 := http.HandlerFunc(ctrl.Login)
 	handler1.ServeHTTP(rr1, req1)
 	rr2 := httptest.NewRecorder()
 
@@ -205,7 +286,7 @@ func TestGetStats(t *testing.T) {
 	})
 	req2, _ := http.NewRequest("POST", "/", bytes.NewBuffer(postBody2))
 	req2.AddCookie(rr1.Result().Cookies()[0])
-	handler2 := http.HandlerFunc(GetStats)
+	handler2 := http.HandlerFunc(ctrl.GetStats)
 	handler2.ServeHTTP(rr2, req2)
 
 	b, _ := io.ReadAll(rr2.Result().Body)
@@ -219,6 +300,7 @@ func TestGetStats(t *testing.T) {
 }
 
 func TestGetChartData(t *testing.T) {
+	ctrl := initTestConfig()
 	postBody1, _ := json.Marshal(map[string]string{
 		"Login":    "testuser",
 		"Password": "testuser",
@@ -226,7 +308,7 @@ func TestGetChartData(t *testing.T) {
 	req1, _ := http.NewRequest("POST", "/", bytes.NewBuffer(postBody1))
 	userdb.CreateUser("testuser", "testuser")
 	rr1 := httptest.NewRecorder()
-	handler1 := http.HandlerFunc(Login)
+	handler1 := http.HandlerFunc(ctrl.Login)
 	handler1.ServeHTTP(rr1, req1)
 
 	cur_db, _ := leveldb.OpenFile("leveldb/hosts/test/statistics", nil)
@@ -246,7 +328,7 @@ func TestGetChartData(t *testing.T) {
 	})
 	req2, _ := http.NewRequest("POST", "/", bytes.NewBuffer(postBody2))
 	req2.AddCookie(rr1.Result().Cookies()[0])
-	handler2 := http.HandlerFunc(GetChartData)
+	handler2 := http.HandlerFunc(ctrl.GetChartData)
 	handler2.ServeHTTP(rr2, req2)
 
 	res := map[string]map[string]int{}

@@ -80,6 +80,7 @@ Once done, just go to <your host> and login as "admin" with <any password>.
 ## Available Environment Options:
 | Environment Variable       | Description   | Defaults | Required |
 |----------------------------|---------------------------------|--------|-----------------|
+| DOCKER_HOST              | URL of the docker socket to connect to. See below | `unix:///var/run/docker.sock` | |
 | ADMIN_USERNAME           | Username for initial user                        | `admin`                 | if `AGENT=false`
 | ADMIN_PASSWORD           | Password for initial user                        |                    | if `AGENT=false`
 | PORT               | Port to listen on                                | `2874`             | if `AGENT=false`
@@ -89,3 +90,8 @@ Once done, just go to <your host> and login as "admin" with <any password>.
 | HOST               | Url to OnLogs host from protocol to domain name. |                    | if `AGENT=true`
 | ONLOGS_TOKEN       | Token that will use an agent to authorize and connect to HOST | Generates with OnLogs interface   | if `AGENT=true`
 | MAX_LOGS_SIZE | Maximum allowed total logs size before cleanup triggers. Accepts human-readable formats like 5GB, 500MB, 1.5GB etc. When exceeded, 10% of logs (by count) will be removed proportionally across containers starting from oldest | 10GB | -
+
+### Docket socket URL
+By default the app will connect using the raw unix socket. But this can be overriden via the ENV variable `DOCKER_HOST`. That way you can specify fully qualified URL to the socket or URL of an docker socket proxy.
+
+In `compose-socket-proxy.yml` you can see a sample compose file for starting the socket proxy. To use it in the app set `DOCKER_HOST=http://localhost:2375` in the ENV.

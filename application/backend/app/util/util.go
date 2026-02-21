@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -15,7 +14,7 @@ import (
 	"time"
 
 	"github.com/devforth/OnLogs/app/vars"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/syndtr/goleveldb/leveldb"
 	"golang.org/x/sys/unix"
 )
@@ -23,13 +22,13 @@ import (
 func replaceVarForAllFilesInDir(dirName string, dir_files []fs.DirEntry) {
 	for _, dir_file := range dir_files {
 		if strings.HasSuffix(dir_file.Name(), ".js") || strings.HasSuffix(dir_file.Name(), ".css") || strings.HasSuffix(dir_file.Name(), ".html") {
-			input, err := ioutil.ReadFile("dist/" + dirName + "/" + dir_file.Name())
+			input, err := os.ReadFile("dist/" + dirName + "/" + dir_file.Name())
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
 			output := bytes.Replace(input, []byte("/ONLOGS_PREFIX_ENV_VARIABLE_THAT_SHOULD_BE_REPLACED_ON_BACKEND_INITIALIZATION"), []byte(os.Getenv("ONLOGS_PATH_PREFIX")), -1)
-			if err = ioutil.WriteFile("dist/"+dirName+"/"+dir_file.Name(), output, 0666); err != nil {
+			if err = os.WriteFile("dist/"+dirName+"/"+dir_file.Name(), output, 0666); err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}

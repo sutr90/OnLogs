@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 
+	"github.com/devforth/OnLogs/app/daemon"
 	"github.com/devforth/OnLogs/app/db"
+	"github.com/devforth/OnLogs/app/docker"
 	"github.com/devforth/OnLogs/app/routes"
 	"github.com/devforth/OnLogs/app/streamer"
 	"github.com/devforth/OnLogs/app/util"
+	"github.com/docker/docker/client"
 	"github.com/joho/godotenv"
 )
 
@@ -26,8 +30,8 @@ func init_config() {
 		os.Setenv("JWT_SECRET", string(token))
 	}
 
-	if os.Getenv("DOCKER_SOCKET_PATH") == "" {
-		os.Setenv("DOCKER_SOCKET_PATH", "/var/run/docker.sock")
+	if os.Getenv("DOCKER_HOST") == "" {
+		os.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock")
 	}
 
 	if os.Getenv("MAX_LOGS_SIZE") == "" {
@@ -40,47 +44,71 @@ func init_config() {
 func main() {
 	godotenv.Load(".env")
 	init_config()
+
+	cli, _ := client.NewClientWithOpts(client.FromEnv)
+	defer cli.Close()
+
+	dockerService := &docker.DockerService{
+		Client: cli,
+	}
+
+	daemonService := &daemon.DaemonService{
+		DockerClient: dockerService,
+	}
+
+	streamController := &streamer.StreamController{
+		DaemonService: daemonService,
+	}
+
+	bgContext := context.Background()
+
 	if os.Getenv("AGENT") != "" {
-		streamer.StreamLogs()
+		streamController.StreamLogs(bgContext)
 	}
 
 	go db.DeleteUnusedTokens()
-	go streamer.StreamLogs()
+	go streamController.StreamLogs(bgContext)
 	// go util.RunSpaceMonitoring()
 	util.ReplacePrefixVariableForFrontend()
 	util.CreateInitUser()
 
+	// Initialize the "Controller" with its dependencies
+	routerCtrl := &routes.RouteController{
+		DockerService: dockerService,
+		DaemonService: daemonService,
+	}
+
 	pathPrefix := os.Getenv("ONLOGS_PATH_PREFIX")
-	http.HandleFunc(pathPrefix+"/", routes.Frontend)
-	http.HandleFunc(pathPrefix+"/api/v1/addHost", routes.AddHost)
-	http.HandleFunc(pathPrefix+"/api/v1/addLogLine", routes.AddLogLine)
-	http.HandleFunc(pathPrefix+"/api/v1/askForDelete", routes.AskForDelete)
-	http.HandleFunc(pathPrefix+"/api/v1/changeFavorite", routes.ChangeFavourite)
-	http.HandleFunc(pathPrefix+"/api/v1/checkCookie", routes.CheckCookie)
-	http.HandleFunc(pathPrefix+"/api/v1/createUser", routes.CreateUser)
-	http.HandleFunc(pathPrefix+"/api/v1/deleteContainer", routes.DeleteContainer)
-	http.HandleFunc(pathPrefix+"/api/v1/deleteContainerLogs", routes.DeleteContainerLogs)
-	http.HandleFunc(pathPrefix+"/api/v1/deleteDockerLogs", routes.DeleteDockerLogs)
-	http.HandleFunc(pathPrefix+"/api/v1/deleteUser", routes.DeleteUser)
-	http.HandleFunc(pathPrefix+"/api/v1/editHostname", routes.EditHostname)
-	http.HandleFunc(pathPrefix+"/api/v1/editUser", routes.EditUser)
-	http.HandleFunc(pathPrefix+"/api/v1/getChartData", routes.GetChartData)
-	http.HandleFunc(pathPrefix+"/api/v1/getDockerSize", routes.GetDockerSize)
-	http.HandleFunc(pathPrefix+"/api/v1/getHosts", routes.GetHosts)
-	http.HandleFunc(pathPrefix+"/api/v1/getLogWithPrev", routes.GetLogWithPrev)
-	http.HandleFunc(pathPrefix+"/api/v1/getLogs", routes.GetLogs)
-	http.HandleFunc(pathPrefix+"/api/v1/getLogsStream", routes.GetLogsStream)
-	http.HandleFunc(pathPrefix+"/api/v1/getPrevLogs", routes.GetPrevLogs)
-	http.HandleFunc(pathPrefix+"/api/v1/getSecret", routes.GetSecret)
-	http.HandleFunc(pathPrefix+"/api/v1/getSizeByAll", routes.GetSizeByAll)
-	http.HandleFunc(pathPrefix+"/api/v1/getSizeByService", routes.GetSizeByService)
-	http.HandleFunc(pathPrefix+"/api/v1/getStats", routes.GetStats)
-	http.HandleFunc(pathPrefix+"/api/v1/getStorageData", routes.GetStorageData)
-	http.HandleFunc(pathPrefix+"/api/v1/getUserSettings", routes.GetUserSettings)
-	http.HandleFunc(pathPrefix+"/api/v1/getUsers", routes.GetUsers)
-	http.HandleFunc(pathPrefix+"/api/v1/login", routes.Login)
-	http.HandleFunc(pathPrefix+"/api/v1/logout", routes.Logout)
-	http.HandleFunc(pathPrefix+"/api/v1/updateUserSettings", routes.UpdateUserSettings)
+	http.HandleFunc(pathPrefix+"/", routerCtrl.Frontend)
+	http.HandleFunc(pathPrefix+"/api/v1/addHost", routerCtrl.AddHost)
+	http.HandleFunc(pathPrefix+"/api/v1/addLogLine", routerCtrl.AddLogLine)
+	http.HandleFunc(pathPrefix+"/api/v1/askForDelete", routerCtrl.AskForDelete)
+	http.HandleFunc(pathPrefix+"/api/v1/changeFavorite", routerCtrl.ChangeFavourite)
+	http.HandleFunc(pathPrefix+"/api/v1/checkCookie", routerCtrl.CheckCookie)
+	http.HandleFunc(pathPrefix+"/api/v1/createUser", routerCtrl.CreateUser)
+	http.HandleFunc(pathPrefix+"/api/v1/deleteContainer", routerCtrl.DeleteContainer)
+	http.HandleFunc(pathPrefix+"/api/v1/deleteContainerLogs", routerCtrl.DeleteContainerLogs)
+	http.HandleFunc(pathPrefix+"/api/v1/deleteDockerLogs", routerCtrl.DeleteDockerLogs)
+	http.HandleFunc(pathPrefix+"/api/v1/deleteUser", routerCtrl.DeleteUser)
+	http.HandleFunc(pathPrefix+"/api/v1/editHostname", routerCtrl.EditHostname)
+	http.HandleFunc(pathPrefix+"/api/v1/editUser", routerCtrl.EditUser)
+	http.HandleFunc(pathPrefix+"/api/v1/getChartData", routerCtrl.GetChartData)
+	http.HandleFunc(pathPrefix+"/api/v1/getDockerSize", routerCtrl.GetDockerSize)
+	http.HandleFunc(pathPrefix+"/api/v1/getHosts", routerCtrl.GetHosts)
+	http.HandleFunc(pathPrefix+"/api/v1/getLogWithPrev", routerCtrl.GetLogWithPrev)
+	http.HandleFunc(pathPrefix+"/api/v1/getLogs", routerCtrl.GetLogs)
+	http.HandleFunc(pathPrefix+"/api/v1/getLogsStream", routerCtrl.GetLogsStream)
+	http.HandleFunc(pathPrefix+"/api/v1/getPrevLogs", routerCtrl.GetPrevLogs)
+	http.HandleFunc(pathPrefix+"/api/v1/getSecret", routerCtrl.GetSecret)
+	http.HandleFunc(pathPrefix+"/api/v1/getSizeByAll", routerCtrl.GetSizeByAll)
+	http.HandleFunc(pathPrefix+"/api/v1/getSizeByService", routerCtrl.GetSizeByService)
+	http.HandleFunc(pathPrefix+"/api/v1/getStats", routerCtrl.GetStats)
+	http.HandleFunc(pathPrefix+"/api/v1/getStorageData", routerCtrl.GetStorageData)
+	http.HandleFunc(pathPrefix+"/api/v1/getUserSettings", routerCtrl.GetUserSettings)
+	http.HandleFunc(pathPrefix+"/api/v1/getUsers", routerCtrl.GetUsers)
+	http.HandleFunc(pathPrefix+"/api/v1/login", routerCtrl.Login)
+	http.HandleFunc(pathPrefix+"/api/v1/logout", routerCtrl.Logout)
+	http.HandleFunc(pathPrefix+"/api/v1/updateUserSettings", routerCtrl.UpdateUserSettings)
 
 	fmt.Println("Listening on port:", string(os.Getenv("PORT"))+"...")
 	fmt.Println("ONLOGS: ", http.ListenAndServe(":"+string(os.Getenv("PORT")), nil))
